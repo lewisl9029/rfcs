@@ -6,7 +6,7 @@
 
 This RFC introduces a new pattern/primitive, the `Anonymous` component (and the `anonymous` function as a layer of syntatic sugar). Final naming is TBD, userspace proof of concept [here](https://github.com/lewisl9029/react-anonymous), implementation is a [1 liner](https://github.com/lewisl9029/react-anonymous/blob/master/src/index.js).
 
-Essentially, this RFC aims to relax the now infamous Rules of Hooks to provide significantly better developer ergonomics by making hook usage less restrictive when it comes to the extra levels of indirection hooks usage often necessitates, i.e. defining/naming trivial new components, and all the associated boilerplate with types and props drilling.
+Essentially, this RFC aims to relax the now infamous Rules of Hooks to provide significantly better developer ergonomics by making hook usage less restrictive when it comes to the extra levels of indirection it often necessitates, i.e. defining/naming trivial new components to comply with rules of hooks, and all the associated boilerplate with types and props drilling.
 
 Here's what the new rules of hooks could look like once this RFC is fully adopted:
 
@@ -20,7 +20,7 @@ Here's what the new rules of hooks could look like once this RFC is fully adopte
 
 Using my proof of concept in userspace: https://github.com/lewisl9029/react-anonymous
 
-Examples are slightly contrived to fit in a variety of use cases, but hopefully it showcases all the new possibilities adequately.
+Examples are slightly contrived to fit in a variety of use cases, but hopefully it showcases all the new possibilities adequately. I've left some inline comments sprinkled throughout to help focus attention and provide additional context.
 
 ```js
 // This example uses the `anonymous` function for syntactic sugar to 
@@ -40,8 +40,8 @@ const ImagineIfYouCould = ({
     return anonymous(() => React.useContext(LoadingMessageContext));
   }
 
+  // Call hooks after an early return
   return anonymous(() => {
-    // Call hooks after an early return
     const [isOpen, setIsOpen] = React.useState(false);
 
     return (
@@ -69,7 +69,7 @@ const ImagineIfYouCould = ({
 };
 ```
 
-Here's an equivalent implementation without the anonymous component pattern:
+For contrast, here's an equivalent implementation without the anonymous component pattern (again using comments to offer commentary):
 
 ```js
 import * as React from "react";
@@ -157,7 +157,7 @@ As illustrated in the example above, this new form of indirection can add a sign
 
 The anonymous component pattern introduced in this RFC aims to directly address these shortcomings of React Hooks and offer users the option to use hooks with significantly less indirection.
 
-More interesting, it opens up the possibility for a new set of use cases for hooks where previously the excessive levels of indirection necessitated by the current rules of hooks made usage ergonomics prohibitively poor. My most prominent use case for this is an experimental [useStyles](https://github.com/lewisl9029/use-styles) CSS-in-JS hook meant to be used at arbitrary depth to provide styles to elements without necessitating indirection through named styled components at every step of the way (think of it as a more robust, runtime-only version of `@emotion/babel-plugin`'s [css prop](https://emotion.sh/docs/css-prop)). I'm hopeful that more use cases for React Hooks like this will be discovered once we're able to alleviate the forced indirection problem.
+More interestingly, it opens up the possibility for a new set of use cases for hooks where previously the excessive levels of indirection necessitated by the current rules of hooks made usage ergonomics prohibitively poor. My most prominent use case for this is an experimental [useStyles](https://github.com/lewisl9029/use-styles) CSS-in-JS hook meant to be used at arbitrary depth to provide styles to elements without necessitating indirection through named styled components at every step of the way (think of it as a more robust, runtime-only version of `@emotion/babel-plugin`'s [css prop](https://emotion.sh/docs/css-prop)). I'm hopeful that more use cases for React Hooks like this will be discovered once we're able to alleviate the forced indirection problem.
 
 # Detailed design
 
@@ -185,11 +185,11 @@ const Example = () => {
 
 At first sight, this might look like a violation of the rules of hooks on calling within a callback, but in practice, it's not in violation because the hooks end up getting called at the top level of the `Anonymous` component's render function thanks to the `children` render prop.
 
-The [official linting rule for React hooks](https://www.npmjs.com/package/eslint-plugin-react-hooks) is not able to recognize this fact, however, and thus treats this as a violation. So we'll need to make an exception in the linting rule for the anonymous component pattern, as I've done in [this fork](https://github.com/facebook/react/compare/master...lewisl9029:support-render-hooks-in-rule-of-hooks).
+The [official linting rule for React hooks](https://www.npmjs.com/package/eslint-plugin-react-hooks) is not able to recognize this fact, however, and thus still treats this as a violation. So we'll need to make an exception in the linting rule for the anonymous component pattern, as I've done in [this fork](https://github.com/facebook/react/compare/master...lewisl9029:support-render-hooks-in-rule-of-hooks).
 
 This was actually my main motivation for writing up this RFC in hopes of getting official blessing for the pattern, since the lack of support in the linter rule is by far the biggest practical impediment for this pattern to gain widespread adoption in the real world.
 
-We also currently offer a `anonymous` function as syntactic sugar on top of the `Anonymous` component.
+We also currently offer an `anonymous` function as syntactic sugar on top of the `Anonymous` component.
 
 ```js
 export const anonymous = (children, { key } = {}) => React.createElement(Anonymous, { children, key })
@@ -215,14 +215,14 @@ isOpen
   : anonymous(() => useMemo(() => "no", []), { key: "no" })
 ```
 
-When `isOpen` changes, React will rerender the same `Anonymous` component instead of unmount/remount a separate component for the other branch if we don't have a `key` to distinguish between them. We take the `key` as part of an options object instead of accepting it directly to allow for future extension without introducing breaking changes.
+When `isOpen` changes, React will rerender the same `Anonymous` component instead of unmounting/remounting a separate component for the other branch if we don't have a `key` to distinguish between them. We take the `key` as part of an options object instead of accepting it directly to allow for future extension without introducing breaking changes.
 
 # Drawbacks
 
 Here are some drawbacks that I've thought about so far:
 
 - This is yet another new pattern to teach, and makes the rule of hooks slightly more nuanced than it already is, and thus potentially harder to teach as well.
-- This pattern necessitates more complexity in the linter rule implementation. I have implemented the necessary changes in [this fork](https://github.com/facebook/react/compare/master...lewisl9029:support-render-hooks-in-rule-of-hooks), but it could very well be missing edge cases. It may necessitate the same for the [react-refresh babel plugin](https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshBabelPlugin.js) as well, though I haven't looked into it in detail yet. Same applies t0 any other form of static analysis the React team may be planning to introducing in the future.
+- This pattern necessitates more complexity in the linter rule implementation. I have implemented the necessary changes in [this fork](https://github.com/facebook/react/compare/master...lewisl9029:support-render-hooks-in-rule-of-hooks), but it could very well be missing edge cases. It may necessitate the same for the [react-refresh babel plugin](https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshBabelPlugin.js) as well, though I haven't looked into it in detail yet. Same applies to any other form of static analysis the React team may be planning to introducing in the future.
 - It is possible to abuse this pattern to create larger component functions than would otherwise be possible with the current rules of hooks, which can act as a forcing function that limits component function size in certain cases. Though in my opinion, this forcing function adds net negative value as it removes too many degrees of freedom over when to add/remove indirection from the hands of users.
 - This pattern can add extra lines and extra levels of indentation in component functions when used, which can add up to a significant level of visual noise.
 - This pattern can introduce a significant number of `Anonymous` component nodes, which can make debugging more cumbersome, and may have performance implications for reconciliation due to a larger component tree.
@@ -243,7 +243,7 @@ I'm still not entirely settled on whether to recommend the component API or the 
 - The function version may look more foreign inside a component function as it's not JSX and as a result may be more difficult to teach. 
 - The component version doesn't need any special APIs for passing in props like the React `key`, as it's meant to be rendered like any other component.
 
-In the current state, the function API is a _lot_ more ergonomic to use, but its advantages over the component API may be short lived if the pattern can gain adoption and influence projects like prettier to implement special cases support for it. But at the same time, lack of support in prettier may hinder early adoption if we went with the component API, creating a chicken-and-egg situation.
+In the current state, the function API is a _lot_ more ergonomic to use, but its advantages over the component API may be short lived if the pattern can gain adoption and influence projects like prettier to implement special case support for it. But at the same time, lack of support in prettier may hinder early adoption if we went with the component API, creating a chicken-and-egg situation.
 
 Not implementing this simply means we continue with the status quo where users are forced to create new components every time they want to use a hook in a place that would violate rules of hooks.
 
@@ -253,49 +253,59 @@ There are no breaking changes involved in this proposal as it's a completely new
 
 # How we teach this
 
-As mentioned in the alternatives section, I've gone through a few iterations of naming, and am currently happy with the current terminology of "anonymous components" for the pattern, and "Anonymous" for the name of the component/function APIs. 
+As mentioned in the alternatives section, I've gone through a few iterations of naming, and am currently happy with the latest terminology of "anonymous components" for the pattern, and "Anonymous" for the name of the component/function APIs. 
 
-The name draws parallels to anonymous functions, which is a useful analogue for building the mental model, as with the introduction of this pattern, we now have both named and anonymous components, and anonymous ones don't have to be explicitly created before they are used directly inline. Though it's not a perfect analogy as the anonymous component is really just one named component that's being re-used over and over again with different implementations, rather than created on the spot at usage as is the case with anonymous functions.
+The name draws parallels to anonymous functions, which is a useful analogue for building the mental model, as with the introduction of this pattern, we now have both named and anonymous components, and anonymous ones don't have to be explicitly created before they are used, and can be used inline within other component functions, unlike named components. Though it's not a perfect analogy as under the hood, the anonymous component is really just the same named component that's being re-used over and over again with different implementations, rather than created on the spot at usage as is the case with anonymous functions.
 
 I feel a good way to teach this could be to introduce it in a standalone guide describing its various use cases, and linking to the guide in places in the existing docs where we discuss rules of hooks by mentioning how anonymous components can help. My experience in this area is definitly lacking though, so would love to get ideas/thoughts from the more seasoned educators on the React team and in the community.
 
 # Unresolved questions
 
-1. I'd love some help brainstorming use cases for this pattern outside of hooks.
+1. Does this pattern pose any implications for concurrent mode and/or server components that I may have missed?
 
-Here's one that I've discovered involving contexts:
+2. Are there ways to implement this as a special first-class primitive that can work around edge cases like the one below, and potentially have performance/debugging benefits over the userspace version?
 
-```js
-import * as React from 'react'
-import anonymous from "@lewisl9029/react-anonymous";
+    ```js
+    isOpen
+      ? anonymous(() => useMemo(() => "yes", []))
+      : anonymous(() => useMemo(() => "no", []))
+    ```
 
-const themeContext = React.createContext()
+3. I'd love some help brainstorming use cases for this pattern outside of hooks.
 
-const Example = () => {
-  return (
-    <themeContext.Provider value={{ foreground: 'black', background: 'white' }}>
-      {anonymous(() => {
-        // Calling useContext(themeContext) outside of anonymous would result in undefined.
-        // 
-        // Since only components downstream from the component where the Provider 
-        // is rendered can read from the Provider.
-        const theme = React.useContext(themeContext)
-        return (
-          <span className={
-            useStyles(
-              () => ({ 
-                color: theme.foreground, 
-                backgroundColor: theme.background 
-              }), 
-              [theme.background, theme.background]
-            )}
-          >
-            themed text
-          </span>
-      })}
-    </themeContext.Provider>
-  )
-}
-```
+    Here's one that I've discovered involving contexts:
+
+    ```js
+    import * as React from 'react'
+    import anonymous from "@lewisl9029/react-anonymous";
+
+    const themeContext = React.createContext()
+
+    const Example = () => {
+      return (
+        <themeContext.Provider value={{ foreground: 'black', background: 'white' }}>
+          {anonymous(() => {
+            // Calling useContext(themeContext) outside of anonymous would result in undefined.
+            // 
+            // Since only components downstream from the component where the Provider 
+            // is rendered can read from the Provider.
+            const theme = React.useContext(themeContext)
+            return (
+              <span className={
+                useStyles(
+                  () => ({ 
+                    color: theme.foreground, 
+                    backgroundColor: theme.background 
+                  }), 
+                  [theme.background, theme.background]
+                )}
+              >
+                themed text
+              </span>
+          })}
+        </themeContext.Provider>
+      )
+    }
+    ```
 
   
