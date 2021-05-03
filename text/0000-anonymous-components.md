@@ -6,13 +6,15 @@
 
 This RFC introduces a new pattern/primitive, the `Anonymous` component (and the `anonymous` function as a layer of syntatic sugar). Final naming is TBD, userland proof of concept [here](https://github.com/lewisl9029/react-anonymous), implementation is a [1 liner](https://github.com/lewisl9029/react-anonymous/blob/master/src/index.js).
 
-Essentially, this RFC aims to relax the now infamous Rules of Hooks to improve developer ergonomics, by making hook usage less restrictive when it comes to the extra levels of indirection it often necessitates, i.e. defining/naming trivial new components/variables only to comply with rules of hooks, and all the associated boilerplate around naming, types, and props drilling.
+Essentially, this RFC aims to relax the now infamous Rules of Hooks to improve developer ergonomics, by allowing users to opt-in to a new style of hook usage with minimal indirection. In practice, this means users will have an option to avoid hoisting hook calls to the top level, defining/naming new components, adding types boilerplate, or drilling props for the sole purpose of complying with the rules of hooks.
 
 Here's what the new rules of hooks could look like once this RFC is fully adopted:
 
 > ## Only Call Hooks at the Top Level of Component Functions
 > 
 > Don’t call Hooks inside loops, conditions, or nested functions. Instead, always use Hooks at the top level of your component function (including [anonymous](link-to-guide-on-anonymous-component-usage) ones). By following this rule, you ensure that Hooks are called in the same order each time a component renders. That’s what allows React to correctly preserve the state of Hooks between multiple useState and useEffect calls.
+
+Although the goal of the RFC at this point in time is only to unblock adoption of the userland implementation through a modification of the official React hooks linter rule. Any changes to official docs/recommendations can come if/when the userland implementation gains enough traction to be considered sufficiently battle tested.
 
 # Basic example
 
