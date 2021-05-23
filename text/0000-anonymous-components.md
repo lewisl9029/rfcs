@@ -140,7 +140,7 @@ const TodoList = ({
   // How often are we incurring the cost of that useMemo in both branches?
   // How often do we introduce another layer of indirection to optimize?
 
-  // Note the sheer additional distance introduced between definition and usage
+  // Note the additional distance introduced between definition and usage
   // compared to before, where we had 0 distance.
   //
   // Also note how downright useless this name is (adds no new information).
@@ -181,7 +181,9 @@ Hopefully this was enough to pique your interest and demonstrate how this patter
 
 # Motivation
 
-Part of the [original motivation](https://reactjs.org/docs/hooks-intro.html#its-hard-to-reuse-stateful-logic-between-components) for React Hooks was to reduce indirection necessitated by earlier userland patterns like render props and higher-order components:
+## Hooks usage ergonomics are severely compromised by rules of hooks
+
+Part of the [original motivation](https://reactjs.org/docs/hooks-intro.html#its-hard-to-reuse-stateful-logic-between-components) for React Hooks was to reduce indirection compared to earlier userland patterns like render props and higher-order components:
 
 > If you’ve worked with React for a while, you may be familiar with patterns like render props and higher-order components that try to solve this. But these patterns require you to restructure your components when you use them, which can be cumbersome and make code harder to follow.
 
@@ -194,15 +196,17 @@ In practice, transitioning from render props and HOCs to React Hooks involved tr
 
 As illustrated in the example above, this new form of indirection can add a significant amount of friction to working with hooks on a day to day basis, causing countless new named components to be created whose name might add little to no value, and in the process exacerbating prop drilling and types boilerplate.
 
-(blockquoting for emphasis)
+## Users, not libraries, should dictate when to introduce indirection
 
-> On a more fundamental level, I believe that the choice to introduce indirection or not should be left to the case-by-case judgement of the user, not something that should be forced upon them by arbitrary constraints of the APIs they use. 
-> 
-> Control over indirection, or control over granularity of componentization and variable hoisting in this case, is one of the most powerful tools we have for managing complexity.
-> 
-> The anonymous component pattern introduced in this RFC aims to restore this control over indirection to the hands of users, something that has been often deprived from them by the rules of hooks ever since its introduction.
+On a more fundamental level, I believe that the choice to introduce indirection or not should be left to the case-by-case judgement of the user, not something that should be forced upon them by arbitrary constraints of the APIs they use. 
 
-Even more interestingly, it also opens up the possibility for a new set of use cases for hooks, where previously the excessive levels of indirection introduced by the rules of hooks made usage ergonomics prohibitively poor. 
+Control over indirection, or control over granularity of componentization and variable hoisting in this case, is one of the most powerful tools we have for managing complexity.
+
+The anonymous component pattern introduced in this RFC aims to restore this control over indirection to the hands of users, something that has been often deprived from them by the rules of hooks ever since its introduction.
+
+## Opening up additional use cases for hooks
+
+Even more interestingly, the anonymous component pattern also opens up the possibility for a new set of use cases for hooks, where previously the excessive levels of indirection introduced by the rules of hooks made usage ergonomics prohibitively poor. 
 
 My most prominent use case for this is an experimental [useStyles](https://github.com/lewisl9029/use-styles) CSS-in-JS hook meant to provide styles to elements without forcing indirection through named styled components at every step of the way (think of it as a more robust, runtime-only version of `@emotion/babel-plugin`'s [css prop](https://emotion.sh/docs/css-prop)). 
 
@@ -290,9 +294,9 @@ const Example = () => {
 }
 ```
 
-We can see that it has a more compact vertical footprint by 5 lines (as formatted by the current version of prettier), and is significantly less burdensome to type.
+We can see that it has a more compact vertical footprint by 5 lines, as formatted by the current version of prettier, and is significantly less burdensome to type. In the [basic example](#basic-example) at the top, I ended up formatting manually to make the vertical real-estate usage comparable to the function version, in order to present it in the best possible light. In practice, I use the function API almost exclusively over the component API.
 
-In the function API, we accept the React `key` as an arg to offer a workaround for this edge case where the same `Anonymous` component ends up getting rendered in both branches:
+In the function API, we must also accept the React `key` as an arg to offer a workaround for this edge case where the same `Anonymous` component ends up getting rendered in both branches:
 
 ```js
 isOpen
@@ -301,6 +305,15 @@ isOpen
 ```
 
 When `isOpen` changes, React will rerender the same `Anonymous` component instead of unmounting/remounting a separate component for the other branch if we don't have a `key` to distinguish between them. We take the `key` as part of an options object instead of accepting it directly to allow for future extension without introducing breaking changes.
+
+In the component API, we don't need a special API for this since users can pass in a key to the component directly like they always did before:
+
+```js
+isOpen
+  ? <Anonymous key="yes">{() => useMemo(() => "yes", [])}</Anonymous>
+  : <Anonymous key="no">{() => useMemo(() => "no", [])}</Anonymous>
+```
+
 
 # Drawbacks
 
@@ -338,11 +351,45 @@ In the current state, the function API is a _lot_ more ergonomic to use, but its
 
 Because the linter rule is the only thing stopping this pattern from gaining adoption as a purely userland solution, we could potentially add some configuration to the linter rule to allow for this pattern, instead of endorsing and promoting the pattern officially.
 
-In fact I would probably prefer to start with this approach to unblock more widespread adoption, so we can work out any potential unforeseen issues in userland, and then eventually have the React team endorse it officially once it has been sufficiently battle tested. More in the [following section](#adoption-strategy).
+In fact I would probably prefer to start with this approach to unblock more widespread adoption, so we can work out any potential unforeseen issues in userland, and then eventually have the React team endorse it officially when/if it becomes sufficiently battle tested. More in the [following section](#adoption-strategy).
+
+## Turning every basic DOM element and React.Fragment into optional Anonymous components
+
+This is a far more radical idea that I haven't had the chance to fully flesh out yet, but imagine if every basic DOM element accepted the same `children` function API as an Anonymous component, and can act as a new component boundary for inline hooks usage like the Anonymous component.
+
+```js
+const Example = ({ loading }) => {
+  if (loading) {
+    // Capital D since this JSX can't render this otherwise, but 
+    // with native support in react-dom, that can change
+    return <Div>{() => useMemo(() => 'Loading', [])}</Div>
+  }
+
+  return <Div>{() => useMemo(() => 'Loaded', [])}</Div>
+}
+```
+
+This can work if the basic elements were implemented as something like this:
+
+```jd
+// Need a separate component to execute children in due to 
+// rule of hooks on branching
+const AnonymousDiv = ({ children }) => <div>{children()}</div>
+
+const Div = (props) => {
+  if (typeof props.children === 'function') {
+    return <AnonymousDiv {...props} />
+  }
+
+  return <div {...props} />
+}
+```
+
+I wouldn't recommend we jump straight into this solution head-first, but it certainly has some interesting benefits around boilerplate reduction over the separate Anonymous component that I'd like to explore further in userland.
 
 # Adoption strategy
 
-There are no breaking changes involved in this proposal as it's a completely new pattern. The pattern can be adopted in a grassroots fashion as people find compelling use cases for it.
+There are no breaking changes involved in this proposal as it's a completely new pattern. The pattern can be adopted in a grassroots manner as people find compelling use cases for it.
 
 However, the current iteration of the linter rule is a blocker to adoption since it incorrectly assumes hook calls inside anonymous components are in violation of the rules of hooks.
 
@@ -429,6 +476,6 @@ The React team has expressed interest in pursuing further investments in static 
 
 Regardless of whether or not this RFC gets accepted, I'd like for the React team to see this RFC as a cautionary tale on how _relying on static analysis can act as an enormous point of friction, and dramatically limit the scope and feasibility of userland experimentation and innovation_, which has been an integral part of how React has evolved to this point. 
 
-Hooks itself evolved from and improved upon userland solutions to similar problems (HoCs and render props). But in my view, the fact that it practically demands to be used in conjunction with a linter rule (and eventually a more elaborate compiler) to maintain correctness and ergonomics is a fundamental design flaw that future evolutions of the API should attempt to eliminate, and something that other future APIs should not attempt to emulate.
+Hooks itself evolved from and improved upon userland solutions to similar problems (HoCs and render props). But in my view, the fact that it practically demands to be used in conjunction with a linter rule (and eventually a more elaborate compiler) to maintain correctness and ergonomics is a fundamental design flaw that future evolutions of the API should attempt to eliminate, and not something to double down on.
 
 If the React team values maximizing the degrees of freedom for those of us in userland to experiment, and eventually see those experiments gain mass adoption and inspire further innovation, I would love to see a shift in focus towards designing runtime APIs that are inherently ergonomic and promote correct usage, without requiring the aid of static analysis.
