@@ -6,24 +6,17 @@
 
 This RFC introduces a new pattern/primitive, the `Anonymous` component (and the `anonymous` function as a layer of syntatic sugar). Final naming is TBD, userland proof of concept [here](https://github.com/lewisl9029/react-anonymous), implementation is a [1 liner](https://github.com/lewisl9029/react-anonymous/blob/master/src/index.js).
 
-Essentially, this RFC aims to relax the now infamous Rules of Hooks to improve developer ergonomics, by allowing users to opt-in to a new style of hook usage with minimal indirection. In practice, this means users will have an option to avoid hoisting hook calls to the top level, defining/naming new components, adding types boilerplate, or drilling props for the sole purpose of complying with the rules of hooks.
+Essentially, this RFC aims to relax the now infamous Rules of Hooks to improve developer ergonomics, by allowing users to opt-in to a new style of hook usage with minimal indirection on a case-by-case basis. In practice, this means users will have an option to avoid hoisting hook calls to the top level, defining/naming new components, adding types boilerplate, or drilling props, any time they find themselves doing so for the sole purpose of complying with the rules of hooks.
 
-Here's what the new rules of hooks could look like once this RFC is fully adopted:
-
-> ## Only Call Hooks at the Top Level of Component Functions
-> 
-> Don’t call Hooks inside loops, conditions, or nested functions. Instead, always use Hooks at the top level of your component function (including [anonymous](link-to-guide-on-anonymous-component-usage) ones). By following this rule, you ensure that Hooks are called in the same order each time a component renders. That’s what allows React to correctly preserve the state of Hooks between multiple useState and useEffect calls.
-
-Although the goal of the RFC at this point in time is only to unblock adoption of the userland implementation through a modification of the official React hooks linter rule. Any changes to official docs/recommendations can come if/when the userland implementation gains enough traction to be considered sufficiently battle tested.
+The goal of the RFC at this point in time is only to unblock adoption of the [userland implementation](https://github.com/lewisl9029/react-anonymous) through a modification of the official React hooks linter rule. Any changes to official docs/recommendations can come if/when the userland implementation gains enough traction to be considered sufficiently battle tested.
 
 # Basic example
-
-Using my proof of concept in userland: https://github.com/lewisl9029/react-anonymous
 
 Examples are slightly contrived to fit in a variety of use cases, but hopefully it showcases all the new possibilities adequately. I've left some inline comments sprinkled throughout to help focus attention and provide additional context.
 
 ```js
 import * as React from 'react'
+// Using my proof of concept in userland: https://github.com/lewisl9029/react-anonymous
 import { Anonymous } from '@lewisl9029/react-anonymous'
 
 const TodoList = ({ 
@@ -83,7 +76,7 @@ const TodoList = ({
 }
 ```
 
-For contrast, here's an equivalent implementation without the anonymous component pattern (again using comments to offer commentary):
+For contrast, here's an equivalent implementation without the anonymous component pattern (again using comments to offer context):
 
 ```js
 import * as React from 'react'
@@ -192,25 +185,27 @@ React Hooks in its current iteration doesn't fully accomplish this design goal, 
 > - The “Rules of Hooks”: in order to make Hooks work, React requires that Hooks are called unconditionally. Component authors may find it unintuitive that Hook calls can't be moved inside if statements, loops, and helper functions.
 > - The “Rules of Hooks” can make some types of refactoring more difficult. For example, adding an early return to a component is no longer possible without moving all Hook calls to before that conditional.
 
-In practice, transitioning from render props and HOCs to React Hooks involved trading the various forms of indirection necessitated by those patterns for a different form of indirection necessitated by the rules of hooks, which often forces users to create extra layers of components for the sole purpose of ensuring hook calls remain at the top level of component functions.
+In practice, transitioning from render props and HOCs to React Hooks involved trading the various forms of indirection necessitated by those patterns for a different form of indirection necessitated by the rules of hooks, which often forces users to create extra layers of components and prop drilling and hoist variable definitions far away from their usage sites for the sole purpose of ensuring hook calls remain at the top level of component functions.
 
-As illustrated in the example above, this new form of indirection can add a significant amount of friction to working with hooks on a day to day basis, causing countless new named components to be created whose name might add little to no value, and in the process exacerbating prop drilling and types boilerplate.
+Overall, judging from the incredible rate of hooks adoption, this was a tradeoff that the community was very much willing to accept in exchange for the myriad of benefits hooks provided over the previous patterns, but that doesn't mean we shouldn't try to explore ways to improve usage ergonomics even further. 
+
+The anonymous components pattern introduced in this RFC has the potential to bring hooks closer to the original vision of an approach to sharing logic between components that doesn't force users to restructure their components (i.e. introduce indirection) when there is otherwise no compelling reason to do so.
 
 ## Users, not libraries, should dictate when to introduce indirection
 
 On a more fundamental level, I believe that the choice to introduce indirection or not should be left to the case-by-case judgement of the user, not something that should be forced upon them by arbitrary constraints of the APIs they use. 
 
-Control over indirection, or control over granularity of componentization and variable hoisting in this case, is one of the most powerful tools we have for managing complexity.
+Control over indirection (control over granularity of componentization, variable declarations/hoisting, orchestration of control flows, etc in this case), is one of the most powerful tools we have for managing complexity.
 
-The anonymous component pattern introduced in this RFC aims to restore this control over indirection to the hands of users, something that has been often deprived from them by the rules of hooks ever since its introduction.
+The anonymous component pattern introduced in this RFC aims to restore this control over indirection to the hands of users, something that has been often deprived from them in countless instances by the rules of hooks ever since its introduction.
 
 ## Opening up additional use cases for hooks
 
 Even more interestingly, the anonymous component pattern also opens up the possibility for a new set of use cases for hooks, where previously the excessive levels of indirection introduced by the rules of hooks made usage ergonomics prohibitively poor. 
 
-My most prominent use case for this is an experimental [useStyles](https://github.com/lewisl9029/use-styles) CSS-in-JS hook meant to provide styles to elements without forcing indirection through named styled components at every step of the way (think of it as a more robust, runtime-only version of `@emotion/babel-plugin`'s [css prop](https://emotion.sh/docs/css-prop)). 
+My most prominent use case for this is an experimental [useStyles](https://github.com/lewisl9029/use-styles) CSS-in-JS hook meant to provide styles to elements without forcing indirection through named styled components at every step of the way (think of it as a runtime-only version of `@emotion/babel-plugin`'s [css prop](https://emotion.sh/docs/css-prop)). 
 
-I'm hopeful that more use cases for React hooks like this will be discovered once we're able to alleviate the forced indirection problem.
+I'm hopeful that more use cases for React hooks like this will become viable once we're able to alleviate the forced indirection problem.
 
 # Detailed design
 
@@ -260,7 +255,7 @@ const Example = () => {
 
 The [official linting rule for React hooks](https://www.npmjs.com/package/eslint-plugin-react-hooks) is not able to recognize these hook calls as valid, however, and will still treat them as violations. So we'll need to make an exception in the linting rule for the anonymous component pattern, as I've done in [this fork](https://github.com/facebook/react/compare/master...lewisl9029:support-render-hooks-in-rule-of-hooks).
 
-This was actually my main motivation for writing up this RFC in hopes of getting official blessing for the pattern, since the lack of support in the linter rule is by far the biggest practical impediment for this pattern to gain widespread adoption in the real world. More thoughts on this [here](#react-hooks-and-static-analysis).
+This was actually my main motivation for writing up this RFC in hopes of getting official blessing for the pattern, since the lack of support in the linter rule is by far the biggest practical impediment for this pattern to gain widespread adoption in the real world (more thoughts related to this [here](#react-hooks-and-static-analysis)).
 
 ## Syntactic sugar
 
@@ -296,6 +291,8 @@ const Example = () => {
 
 We can see that it has a more compact vertical footprint by 5 lines, as formatted by the current version of prettier, and is significantly less burdensome to type. In the [basic example](#basic-example) at the top, I ended up formatting manually to make the vertical real-estate usage comparable to the function version, in order to present it in the best possible light. In practice, I use the function API almost exclusively over the component API.
 
+## An unintuitive edge case
+
 In the function API, we must also accept the React `key` as an arg to offer a workaround for this edge case where the same `Anonymous` component ends up getting rendered in both branches:
 
 ```js
@@ -304,7 +301,11 @@ isOpen
   : anonymous(() => useMemo(() => "no", []), { key: "no" })
 ```
 
-When `isOpen` changes, React will rerender the same `Anonymous` component instead of unmounting/remounting a separate component for the other branch if we don't have a `key` to distinguish between them. We take the `key` as part of an options object instead of accepting it directly to allow for future extension without introducing breaking changes.
+When `isOpen` changes, React will rerender the same `Anonymous` component with a different children prop instead of unmounting/remounting a separate component for the other branch if we don't have a `key` to distinguish between them. 
+
+This can result in bugs in cases like above where the memo value will not update when a different branch gets rendered, and worse, in cases where the brances have different numbers of hook calls, will result in runtime exceptions.
+
+We take the `key` as part of an options object instead of accepting it directly to allow for future extension without introducing breaking changes.
 
 In the component API, we don't need a special API for this since users can pass in a key to the component directly like they always did before:
 
@@ -314,16 +315,50 @@ isOpen
   : <Anonymous key="no">{() => useMemo(() => "no", [])}</Anonymous>
 ```
 
+This is one of the most unintuitive parts to using this pattern, and I've raised it as a [drawback](#drawbacks), and as [an open question](#branching-between-top-level-anonymous-components) to outline my ideas to resolve this in both the short and long term, and to get thoughts from the community.
+
 
 # Drawbacks
 
-Here are some drawbacks that I've thought about so far:
+Here are some drawbacks that I've thought about so far (will attempt to add to this as new issues are discovered in comments):
 
-- This is yet another new pattern to teach, and makes the rule of hooks more nuanced than it already is, and thus potentially harder to teach as well.
-- This pattern creates more complexity in the linter rule implementation. I have implemented the necessary changes in [this fork](https://github.com/facebook/react/compare/master...lewisl9029:support-render-hooks-in-rule-of-hooks), but it could very well be missing edge cases. It may create more complexity for the [react-refresh babel plugin](https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshBabelPlugin.js) as well, though I haven't looked into it in detail yet. Same applies to any other form of static analysis the React team may be planning to introducing in the future. More thoughts on this one in the [additional considerations section](#react-hooks-and-static-analysis).
-- It is possible to abuse this pattern to create larger component functions than would otherwise be possible with the current rules of hooks, which can act as a forcing function that limits component function size in certain cases. Though in my opinion, this forcing function adds net negative value as it removes too many degrees of freedom over when to add/remove indirection from the hands of users. This was discussed extensively in the [motivation section](#motivation).
-- This pattern can add extra lines and extra levels of indentation in component functions when used, which can add up to a significant level of visual noise. This could be partially alleviated with shorthand APIs that make simple usages more likely to be inlined, but not entirely. Although the status quo of introducing new components to adhere to rules of hooks ends up being much more boilerplate heavy all things considered.
-- This pattern can introduce a significant number of `Anonymous` component nodes, which can make debugging more cumbersome, and may have performance implications for reconciliation due to a larger component tree. Though on the performance side, the pattern also happens to enable users to more easily call hooks conditionally inside branches that were previously called unconditionally at the top level, so it's not immediately obvious whether this would lead to a net performance improvement or degradation at scale.
+## Necessary evils as a new pattern
+
+This is yet another new pattern to teach, and makes the rule of hooks more nuanced than it already is, and thus potentially harder to teach as well.
+
+## Potential for bugs/exceptions when branching between top-level anonymous components
+
+React [optimizing away anonymous components](#an-unintuitive-edge-case) at the top of 2 branching paths as the same component being rendered with different props can result in bugs and runtime exceptions if not supplied with different keys, which can be very error prone and unintuitive.
+
+## Introduces additional complexity for static analysis
+
+This pattern creates more complexity in the linter rule implementation. 
+
+I have implemented the necessary changes in [this fork](https://github.com/facebook/react/compare/master...lewisl9029:support-render-hooks-in-rule-of-hooks), but it could very well be missing edge cases. 
+
+It may create more complexity for the [react-refresh babel plugin](https://github.com/facebook/react/blob/master/packages/react-refresh/src/ReactFreshBabelPlugin.js) as well, though I haven't looked into it in detail yet. 
+
+Same applies to any other form of static analysis the React team may be planning to introducing in the future. More thoughts on this one in the [additional considerations section](#react-hooks-and-static-analysis).
+
+## Removes artificial limits to component function sizes
+
+It is possible to use this pattern to create what some could consider _unreasonably_ large component functions, than would otherwise be possible with the current rules of hooks, since the rules of hooks can act as a forcing function that limits component function size in many cases. 
+
+Though in my opinion, this forcing function adds net negative value as it removes too many degrees of freedom over when to add/remove indirection from the hands of users. This was discussed extensively in the [motivation section](#motivation).
+
+## Visual noise and boilerplate
+
+This pattern can add extra lines and extra levels of indentation in component functions when used, which can add up to a significant level of visual noise. This could be partially alleviated with shorthand APIs that make simple usages more likely to be inlined, but not entirely. 
+
+Although the status quo of introducing new components to adhere to rules of hooks can end up being much more boilerplate heavy in many cases, so it's remains to be seen whether this will result in a net reduction or increase in overall _volume_ of boilerplate. 
+
+Though I would posit that the kinds of boilerplate introduced by the anonymous component pattern (extra Anonymous components/anoymous function calls and the resulting extra layers of indentation and lines), is a much less insidious form of boilerplate compared to the kinds of boilerplate resulting from adhering to the rules of hooks today (extra components with props/types definitions, prop drilling/spreading, hoisting of branch-specific logic, etc), as they don't introduce indirection and force us to manually synchronize multiple sources of truth.
+
+## Performance implications
+
+This pattern can introduce a significant number of `Anonymous` component nodes, which can make debugging more cumbersome, and may have performance implications for reconciliation due to a larger component tree. 
+
+Though the pattern also happens to enable users to more easily call hooks conditionally inside branches that were previously called unconditionally at the top level, so it's not immediately obvious whether this would lead to a net performance improvement or degradation at scale in real world scenarios.
 
 # Alternatives
 
@@ -371,7 +406,7 @@ const Example = ({ loading }) => {
 
 This can work if the basic elements were implemented as something like this:
 
-```jd
+```js
 // Need a separate component to execute children in due to 
 // rule of hooks on branching
 const AnonymousDiv = ({ children }) => <div>{children()}</div>
@@ -419,15 +454,21 @@ My experience in this area is definitly lacking though, so would love to get ide
 
 Does this pattern pose any implications for concurrent mode and/or server components that I may have missed?
 
-## Opportunity as a distinct primitive
+## Branching between top-level anonymous components
 
-Are there ways to implement this as a distinct first-class primitive (rather than just a regular userland component) that can work around edge cases like the one below, and potentially have performance/debugging benefits over the userland version?
+As mentioned in [an earlier section](#an-unintuitive-edge-case), using the pattern can result in bugs and exceptions when two branches of a component render an anoymous component at the to level like the example below:
 
 ```js
 isOpen
   ? anonymous(() => useMemo(() => "yes", []))
   : anonymous(() => useMemo(() => "no", []))
 ```
+
+The current workaround offered involves relying on the user to supply a different key between branches to make React recognize that these branches need to be treated as different components to be unmounted/remounted in subsequent renders, which is definitely not ideal since it is much too reliant on human diligence and thus very error prone.
+
+One obvious solution is to add an auto-fixable linting rule to detect these cases and reminder users to supply keys to each branch.
+
+Though the solution I'm personally more interested in exploring in the longer term involves potentially implementing the Anonymous component as a distinct first-class primitive (rather than just a regular userland component) that React can treat differently in its reconciliation process in order to work around edge cases like this. In the process, we may discover opportunities to further improve performance and/or debugging experience over the userland version.
 
 ## Use cases outside of hooks
 
