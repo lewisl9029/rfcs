@@ -6,7 +6,7 @@
 
 This RFC introduces a new pattern/primitive, the `Anonymous` component (and the `anonymous` function as a layer of syntatic sugar). Final naming is TBD, userland proof of concept [here](https://github.com/lewisl9029/react-anonymous), implementation is a [1 liner](https://github.com/lewisl9029/react-anonymous/blob/master/src/index.js).
 
-Essentially, this RFC aims to relax the now infamous Rules of Hooks to improve developer ergonomics, by allowing users to opt-in to a new style of hook usage with minimal indirection on a case-by-case basis. In practice, this means users will have an option to avoid hoisting hook calls to the top level, defining/naming new components, adding types boilerplate, or drilling props, any time they find themselves doing so for the sole purpose of complying with the rules of hooks.
+Essentially, the anonymous components pattern aims to give users the option to use hooks in a way that doesn't force them to introduce indirection (i.e. restructure their components' internal branching, hoist variables to top of component functions, introduce new components that have to be named, prop drilled, have new types defined, etc) for the sole purposes of adhering to the rules of hooks.
 
 The goal of the RFC at this point in time is only to unblock adoption of the [userland implementation](https://github.com/lewisl9029/react-anonymous) through a modification of the official React hooks linter rule. Any changes to official docs/recommendations can come if/when the userland implementation gains enough traction to be considered sufficiently battle tested.
 
@@ -189,13 +189,13 @@ In practice, transitioning from render props and HOCs to React Hooks involved tr
 
 Overall, judging from the incredible rate of hooks adoption, this was a tradeoff that the community was very much willing to accept in exchange for the myriad of benefits hooks provided over the previous patterns, but that doesn't mean we shouldn't try to explore ways to improve usage ergonomics even further. 
 
-The anonymous components pattern introduced in this RFC has the potential to bring hooks closer to the original vision of an approach to sharing logic between components that doesn't force users to restructure their components (i.e. introduce indirection) when there is otherwise no compelling reason to do so.
+The anonymous components pattern introduced in this RFC has the potential to bring hooks closer to the original vision of an approach for sharing logic between components that doesn't force users to introduce indirection (i.e. restructure their components) when there is otherwise no compelling reason to do so.
 
 ## Users, not libraries, should dictate when to introduce indirection
 
 On a more fundamental level, I believe that the choice to introduce indirection or not should be left to the case-by-case judgement of the user, not something that should be forced upon them by arbitrary constraints of the APIs they use. 
 
-Control over indirection (control over granularity of componentization, variable declarations/hoisting, orchestration of control flows, etc in this case), is one of the most powerful tools we have for managing complexity.
+Control over indirection (control over granularity of componentization, variable declarations/hoisting, orchestration of control flows, etc in this case), is one of the most powerful tools we have for managing complexity and cognitive overhead when reading and working with code.
 
 The anonymous component pattern introduced in this RFC aims to restore this control over indirection to the hands of users, something that has been often deprived from them in countless instances by the rules of hooks ever since its introduction.
 
@@ -205,7 +205,9 @@ Even more interestingly, the anonymous component pattern also opens up the possi
 
 My most prominent use case for this is an experimental [useStyles](https://github.com/lewisl9029/use-styles) CSS-in-JS hook meant to provide styles to elements without forcing indirection through named styled components at every step of the way (think of it as a runtime-only version of `@emotion/babel-plugin`'s [css prop](https://emotion.sh/docs/css-prop)). 
 
-I'm hopeful that more use cases for React hooks like this will become viable once we're able to alleviate the forced indirection problem.
+In a world where the rules of hooks restrictions remain rigid, a CSS-in-JS hook like this has very limited benefit over existing `styled.div`-style APIs of emotion and styled-components, since the rules of hooks would be violated for a large number of potential call sites (i.e. `<div className={useStyles({/* */}, [])} />`) if called directly with no indirection, so would have to be refactored into an isolated "styled component" anyways. The anonymous components pattern can be applied to make these usages valid without any signficant refactoring.
+
+I'm hopeful that more use cases for React hooks like this will become viable once we're able to alleviate this forced indirection problem.
 
 # Detailed design
 
@@ -322,9 +324,11 @@ This is one of the most unintuitive parts to using this pattern, and I've raised
 
 Here are some drawbacks that I've thought about so far (will attempt to add to this as new issues are discovered in comments):
 
-## Necessary evils as a new pattern
+## A new pattern to teach/learn
 
-This is yet another new pattern to teach, and makes the rule of hooks more nuanced than it already is, and thus potentially harder to teach as well.
+This is yet another new pattern to teach, and makes the rule of hooks more nuanced than it already is, and thus potentially harder to teach as well. 
+
+Although this pattern also happens to be completely opt-in, so can be learned and applied on an as-needed basis when good use cases are found, or never learned and applied at all for those who don't encounter these use cases or don't find value in it.
 
 ## Potential for bugs/exceptions when branching between top-level anonymous components
 
@@ -344,21 +348,23 @@ Same applies to any other form of static analysis the React team may be planning
 
 It is possible to use this pattern to create what some could consider _unreasonably_ large component functions, than would otherwise be possible with the current rules of hooks, since the rules of hooks can act as a forcing function that limits component function size in many cases. 
 
-Though in my opinion, this forcing function adds net negative value as it removes too many degrees of freedom over when to add/remove indirection from the hands of users. This was discussed extensively in the [motivation section](#motivation).
+Though in my opinion, this forcing function adds net negative value as it removes too many degrees of freedom over when to add/remove indirection from the hands of users. This was discussed extensively in the [motivation section](#motivation) and is core to the value prop.
 
 ## Visual noise and boilerplate
 
 This pattern can add extra lines and extra levels of indentation in component functions when used, which can add up to a significant level of visual noise. This could be partially alleviated with shorthand APIs that make simple usages more likely to be inlined, but not entirely. 
 
-Although the status quo of introducing new components to adhere to rules of hooks can end up being much more boilerplate heavy in many cases, so it's remains to be seen whether this will result in a net reduction or increase in overall _volume_ of boilerplate. 
+Although the status quo of introducing new components to adhere to rules of hooks can end up being much more boilerplate heavy in many cases, so it's remains to be seen whether this will result in a net reduction or increase in _overall volume_ of boilerplate. 
 
-Though I would posit that the kinds of boilerplate introduced by the anonymous component pattern (extra Anonymous components/anoymous function calls and the resulting extra layers of indentation and lines), is a much less insidious form of boilerplate compared to the kinds of boilerplate resulting from adhering to the rules of hooks today (extra components with props/types definitions, prop drilling/spreading, hoisting of branch-specific logic, etc), as they don't introduce indirection and force us to manually synchronize multiple sources of truth.
+Though I would posit that the kind of boilerplate introduced by the anonymous component pattern (extra Anonymous components/anoymous function calls and the resulting extra layers of indentation and lines) is a much less insidious form of boilerplate compared to the kinds of boilerplate resulting from adhering to the rules of hooks today (extra components with props/types definitions, prop drilling/spreading, hoisting of branch-specific logic, etc), as it doesn't introduce indirection or force us to manually synchronize multiple sources of truth in our code.
 
 ## Performance implications
 
 This pattern can introduce a significant number of `Anonymous` component nodes, which can make debugging more cumbersome, and may have performance implications for reconciliation due to a larger component tree. 
 
-Though the pattern also happens to enable users to more easily call hooks conditionally inside branches that were previously called unconditionally at the top level, so it's not immediately obvious whether this would lead to a net performance improvement or degradation at scale in real world scenarios.
+Though the pattern also happens to enable users to more easily call hooks conditionally inside branches that were previously called unconditionally at the top level, so it's not immediately obvious whether this would lead to a net performance improvement or degradation at scale in real world scenarios. 
+
+To be safe, I'd operate under the assumtion that the net effect on performance will be negative. Even still, I feel the overall improvement to developer ergonomics more than justifies this in most use cases. The beauty of the fully opt-in nature of the pattern, however, is that we can still micro-optimize away the pattern for any bottlenecks we identify through profiling.
 
 # Alternatives
 
@@ -452,7 +458,7 @@ My experience in this area is definitly lacking though, so would love to get ide
 
 ## Implications for concurrent mode/server components
 
-Does this pattern pose any implications for concurrent mode and/or server components that I may have missed?
+Does this pattern pose any implications for concurrent mode and/or server components that I may have missed? Nothing obvious has popped up in my mind, but I can't confidently say I have a great grasp of the nuances there.
 
 ## Branching between top-level anonymous components
 
@@ -468,7 +474,7 @@ The current workaround offered involves relying on the user to supply a differen
 
 One obvious solution is to add an auto-fixable linting rule to detect these cases and reminder users to supply keys to each branch.
 
-Though the solution I'm personally more interested in exploring in the longer term involves potentially implementing the Anonymous component as a distinct first-class primitive (rather than just a regular userland component) that React can treat differently in its reconciliation process in order to work around edge cases like this. In the process, we may discover opportunities to further improve performance and/or debugging experience over the userland version.
+Though the solution I'm personally more interested in exploring in the longer term involves potentially implementing the Anonymous component as a distinct first-class primitive (rather than just a regular userland component) that React can treat differently in its reconciliation process in order to work around edge cases like this if at all possible. In the process, we may discover opportunities to further improve performance and/or debugging experience over the userland version.
 
 ## Use cases outside of hooks
 
